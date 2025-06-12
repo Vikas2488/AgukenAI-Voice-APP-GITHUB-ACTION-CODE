@@ -1,0 +1,92 @@
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-trigger-argocd:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout the code
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      # Step 2: Set up Docker Buildx for multi-platform builds
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      # Step 3: Configure AWS credentials
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-1
+
+      # Step 4: Log in to Amazon ECR
+      - name: Log in to Amazon ECR
+        run: |
+          aws ecr get-login-password --region us-west-1 | \
+          docker login --username AWS --password-stdin 024848475874.dkr.ecr.us-west-1.amazonaws.com
+
+      # Step 5: Build and Push Docker image to ECR
+      - name: Build and Push to ECR
+        run: |
+          ECR_REPO_URL=024848475874.dkr.ecr.us-west-1.amazonaws.com/database-apis
+          VERSION_TAG=$(echo ${GITHUB_SHA} | cut -c1-7)
+          docker buildx build --platform linux/amd64,linux/arm64 \
+            -t $ECR_REPO_URL:$VERSION_TAG \
+            -t $ECR_REPO_URL:latest --push .
+
+      # Step 6: Install ArgoCD CLI v2.10.7
+      - name: Install ArgoCD CLI
+        run: |
+          curl -sSL -o argocd https://github.com/argoproj/argo-cd/releases/download/v2.10.7/argocd-linux-amd64
+          chmod +x argocd
+          sudo mv argocd /usr/local/bin/
+
+      # Step 7: Trigger ArgoCD Deployment
+      - name: Trigger ArgoCD Deployment
+        env:
+          ARGOCD_SERVER_URL: argo-cd.kube.aguken.com
+          ARGOCD_USERNAME: ${{ secrets.ARGOCD_USERNAME }}
+          ARGOCD_PASSWORD: ${{ secrets.ARGOCD_PASSWORD }}
+          ARGOCD_APP_NAME: database-voiceapp
+          ARGOCD_REPO_URL: https://github.com/aguken-ai/database-apis-argocd.git
+          ARGOCD_NAMESPACE: development
+        run: |
+          echo "Logging into ArgoCD at $ARGOCD_SERVER_URL..."
+          argocd login $ARGOCD_SERVER_URL \
+            --username $ARGOCD_USERNAME \
+            --password $ARGOCD_PASSWORD \
+            --insecure \
+            --grpc-web
+
+          # Check if the application exists
+          echo "Checking if application $ARGOCD_APP_NAME exists..."
+          if argocd app get $ARGOCD_APP_NAME; then
+            echo "Application $ARGOCD_APP_NAME already exists. Updating it..."
+            argocd app set $ARGOCD_APP_NAME \
+              --repo $ARGOCD_REPO_URL \
+              --path database-apis \
+              --dest-server https://kubernetes.default.svc \
+              --dest-namespace $ARGOCD_NAMESPACE \
+              --project default
+          else
+            echo "Application $ARGOCD_APP_NAME does not exist. Creating it..."
+            argocd app create $ARGOCD_APP_NAME \
+              --repo $ARGOCD_REPO_URL \
+              --path database-apis \
+              --dest-server https://kubernetes.default.svc \
+              --dest-namespace $ARGOCD_NAMESPACE \
+              --project default
+              --upsert
+          fi
+
+          # Sync the application
+          echo "Syncing the application $ARGOCD_APP_NAME..."
+          argocd app sync $ARGOCD_APP_NAME --grpc-web
+
+          echo "Application $ARGOCD_APP_NAME synced successfully."
+
