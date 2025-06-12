@@ -1,0 +1,39 @@
++++++++++++Vikas k8s & linux commands++++++++++++
+
+kubectl port-forward service/ai-service 8080:8080 --namespaces development
+
+kubectl get all -n development
+kubectl get all --all-namespaces
+
+kubectl get deployments --all-namespaces
+
+*#Then to delete the deployment:
+
+kubectl delete -n NAMESPACE deployment DEPLOYMENT
+
+git checkout -b devops-vikas
+
+code .
+
+
+
+
+
+http://ai-service.development.svc.cluster.local:8000
+
+
+
+aws eks describe-cluster --name aguken-ai --query "cluster.identity.oidc.issuer" --output text
+    
+https://oidc.eks.us-west-1.amazonaws.com/id/B566499AFEFAA710AE5DBBC38B8C6DB4
+
+sudo apt purge anydesk
+sudo apt-get install file name
+
+https://d-916716e737.awsapps.com/start
+
+1.alb loadblancer controller in kubernetes eks
+2.istio
+
+to run istio run this command/ export PATH=$PATH:/home/vikas/Downloads/istio-1.23.0-linux-amd64/istio-1.23.0/bin
+
