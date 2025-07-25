@@ -1,5 +1,9 @@
 +++++++++++Vikas k8s & linux commands++++++++++++
 
+........open .pem file use this commad......
+*openssl rsa -in Vikasnew-key.pem -out Vikasnew-key.txt
+
+
 kubectl port-forward service/ai-service 8080:8080 --namespaces development
 
 kubectl get all -n development
